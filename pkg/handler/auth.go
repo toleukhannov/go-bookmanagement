@@ -1,111 +1,125 @@
 package handler
 
 import (
-    "encoding/json"
-    "fmt"
-    "net/http"
-    "github.com/batyrbek/pkg/models"
-    // "github.com/batyrbek/pkg/service"
+	"encoding/json"
+	"net/http"
+	"time"
+	"fmt"
+
+	"github.com/batyrbek/pkg/config"
+	"github.com/batyrbek/pkg/models"
+	"github.com/dgrijalva/jwt-go"
+	"golang.org/x/crypto/bcrypt"
 )
+type LoginRequest struct {
+	Username string
+	Password string
+}
 
-// RegisterHandler обрабатывает запросы на регистрацию нового пользователя
-func RegisterHandler(w http.ResponseWriter, r *http.Request) {
-    var user models.User
-    err := json.NewDecoder(r.Body).Decode(&user)
+var secretKey = []byte("secret-key")
+
+func createToken(username string) (string, error) {
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256,
+		jwt.MapClaims{
+			"username": username,
+			"exp":      time.Now().Add(time.Hour * 24).Unix(),
+		})
+
+	tokenString, err := token.SignedString(secretKey)
+	if err != nil {
+		return "", err
+	}
+	return tokenString, nil
+}
+
+func verifyToken(tokenString string) error {
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		return secretKey, nil
+	})
+	if err != nil {
+		return err
+	}
+	if !token.Valid {
+		return fmt.Errorf("invalid token")
+	}
+
+	return nil
+}
+
+func SignUp(w http.ResponseWriter, r *http.Request) {
+	var request models.User
+	err := json.NewDecoder(r.Body).Decode(&request)
+	if err != nil {
+		http.Error(w, "Failed to read body", http.StatusBadRequest)
+		return
+	}
+
+	// Hash the password
+	hashPassword, err := bcrypt.GenerateFromPassword([]byte(request.Password), bcrypt.DefaultCost)
+	if err != nil {
+		http.Error(w, "Failed to hash password", http.StatusInternalServerError)
+		return
+	}
+	request.Password = string(hashPassword)
+	request.CreatedAt = time.Now()
+
+	// Create new user using GORM
+	if err := config.GetDB().Create(&request).Error; err != nil {
+		http.Error(w, "Failed to create user", http.StatusInternalServerError)
+		return
+	}
+
+	// Respond with created user
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(request)
+}
+
+func Login(w http.ResponseWriter, r *http.Request) {
+	type LoginRequest struct {
+ Username string
+ Password string
+}
+    var loginRequest LoginRequest
+    err := json.NewDecoder(r.Body).Decode(&loginRequest)
     if err != nil {
-        http.Error(w, err.Error(), http.StatusBadRequest)
+        http.Error(w, "Failed to read body", http.StatusBadRequest)
         return
     }
 
-    // Здесь вы можете выполнить проверки на валидность данных пользователя, например, проверку уникальности имени пользователя
-
-    // После проверок вы можете сохранить пользователя в базе данных или выполнить другие необходимые действия
-    // Например:
-    // userService.CreateUser(user)
-
-    // Отправляем успешный ответ клиенту
-    w.WriteHeader(http.StatusOK)
-    fmt.Fprintf(w, "Пользователь успешно зарегистрирован")
-}
-
-// LoginHandler обрабатывает запросы на аутентификацию пользователей
-func LoginHandler(w http.ResponseWriter, r *http.Request) {
+    // Find user by username
     var user models.User
-    err := json.NewDecoder(r.Body).Decode(&user)
-    if err != nil {
-        http.Error(w, err.Error(), http.StatusBadRequest)
+    if err := config.GetDB().Where("username = ?", loginRequest.Username).First(&user).Error; err != nil {
+        http.Error(w, "Invalid username or password", http.StatusUnauthorized)
         return
     }
 
-    // Здесь вы должны выполнить аутентификацию пользователя, сравнивая его данные с данными из базы данных или другого источника
+    // Check password
+    if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(loginRequest.Password)); err != nil {
+        http.Error(w, "Invalid username or password", http.StatusUnauthorized)
+        return
+    }
 
-    // Например, если у вас есть сервис для работы с пользователями, вы можете использовать его для аутентификации:
-    // if userService.Authenticate(user.Username, user.Password) {
-    //     // Если аутентификация успешна, генерируем JWT токен
-    //     token, err := service.GenerateToken(user.Username)
-    //     if err != nil {
-    //         http.Error(w, err.Error(), http.StatusInternalServerError)
-    //         return
-    //     }
-    //     // Отправляем токен клиенту
-    //     json.NewEncoder(w).Encode(token)
-    // } else {
-    //     http.Error(w, "Неверные учетные данные", http.StatusUnauthorized)
-    // }
+    // If authentication is successful, create a token and send it to the user
+    token, err := createToken(user.Username)
+    if err != nil {
+        http.Error(w, "Failed to create token", http.StatusInternalServerError)
+        return
+    }
 
-    // В данном примере возвращаем простое сообщение об успешной аутентификации
+    // Set the token in a cookie
+    http.SetCookie(w, &http.Cookie{
+        Name:     "Authorization",
+        Value:    token,
+        MaxAge:   3600 * 24 * 30,
+        Path:     "/",
+        SameSite: http.SameSiteStrictMode,
+        Secure:   true,
+        HttpOnly: true,
+    })
+
+    // Respond with successful login message
+    w.Header().Set("Content-Type", "application/json")
     w.WriteHeader(http.StatusOK)
-    fmt.Fprintf(w, "Аутентификация успешна")
+    json.NewEncoder(w).Encode(map[string]string{"message": "Login successful"})
 }
-
-
-
-// package handler
-
-// import (
-// 	"net/http"
-
-// 	"github.com/batyrbek/pkg/models"
-// 	"github.com/gin-gonic/gin"
-// )
-
-// func (h *Handler) signUp(c *gin.Context){
-// 	var input models.User
-// 	if err := c.BindJSON(&input); err != nil{
-// 		newErrorResponse(c, http.StatusBadRequest, err.Error())
-// 		return
-// 	}
-
-// 	id, err := h.services.Authorization.CreateUser(input)
-// 	if err != nil{
-// 		newErrorResponse(c, http.StatusInternalServerError, err.Error)
-// 		return
-// 	}
-
-// 	c.JSON(http.StatusOK, map[string]interface{}){
-// 		"id": id,
-// 	}
-// }
-
-// type SignInInput struct{
-// 	Email    string `gorm:""json:"email" binding: "required"`
-// 	Password string `gorm:""json:"password" binding: "required"`
-// }
-
-// func (h *Handler) signIn(c *gin.Context){
-// 	var input models.User
-// 	if err := c.BindJSON(&input); err != nil{
-// 		newErrorResponse(c, http.StatusBadRequest, err.Error())
-// 		return
-// 	}
-
-// 	id, err := h.services.Authorization.GenerateToken(input.Email, input.Password)
-// 	if err != nil{
-// 		newErrorResponse(c, http.StatusInternalServerError, err.Error)
-// 		return
-// 	}
-
-// 	c.JSON(http.StatusOK, map[string]interface{}){
-// 		"id": id,
-// 	}
-// } 

@@ -1,34 +1,32 @@
 package models
 
+import (
+	"github.com/batyrbek/pkg/config"
+	"github.com/jinzhu/gorm"
+)
+
+
 type User struct {
-	ID       int    `json:"id"`
-	Username string `json:"username"`
-	Password string `json:"password"`
+	gorm.Model
+	ID       int    `gorm:"" json:"id"`
+	Username string `gorm:"" json:"username"`
+	Password string `gorm:"" json:"password"`
 }
 
-// package models
+func init() {
+	config.Connect()
+	db = config.GetDB()
+	db.AutoMigrate(&User{})
+}
 
-// import (
-// 	"github.com/batyrbek/pkg/config"
-// 	"github.com/jinzhu/gorm"
-// )
+func (u *User) newUser() *User {
+	db.NewRecord(u)
+	db.Create(&u)
+	return u
+}
 
-// type User struct {
-// 	gorm.Model
-// 	Id       int    `gorm:""json:"-"`
-// 	Name     string `gorm:""json:"name" binding: "required"`
-// 	Email    string `gorm:""json:"email" binding: "required"`
-// 	Password string `gorm:""json:"password" binding: "required"`
-// }
-
-// func init() {
-// 	config.Connect()
-// 	db = config.GetDB()
-// 	db.AutoMigrate(&Book{})
-// }
-
-// func (u *User) CreateUser() *User {
-// 	db.NewRecord(u)
-// 	db.Create(&u)
-// 	return u
-// }
+func DeleteUser(ID int64) User{
+	var user User
+	db.Where("ID=?", ID).Delete(user)
+	return user
+}
