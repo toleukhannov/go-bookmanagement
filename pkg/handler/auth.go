@@ -15,7 +15,7 @@ type LoginRequest struct {
 	Username string
 	Password string
 }
-
+//Token interactions
 var secretKey = []byte("secret-key")
 
 func createToken(username string) (string, error) {
@@ -45,7 +45,7 @@ func verifyToken(tokenString string) error {
 
 	return nil
 }
-
+//SignUp handler
 func SignUp(w http.ResponseWriter, r *http.Request) {
 	var request models.User
 	err := json.NewDecoder(r.Body).Decode(&request)
@@ -74,7 +74,7 @@ func SignUp(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(request)
 }
-
+//Login Handler
 func Login(w http.ResponseWriter, r *http.Request) {
 	type LoginRequest struct {
  Username string
@@ -122,4 +122,22 @@ func Login(w http.ResponseWriter, r *http.Request) {
     w.Header().Set("Content-Type", "application/json")
     w.WriteHeader(http.StatusOK)
     json.NewEncoder(w).Encode(map[string]string{"message": "Login successful"})
+}
+
+func Logout(w http.ResponseWriter, r *http.Request) {
+    // Remove the Authorization cookie
+    http.SetCookie(w, &http.Cookie{
+        Name:     "Authorization",
+        Value:    "",
+        MaxAge:   -1,
+        Path:     "/",
+        SameSite: http.SameSiteStrictMode,
+        Secure:   true,
+        HttpOnly: true,
+    })
+
+    // Respond with a message indicating successful logout
+    w.Header().Set("Content-Type", "application/json")
+    w.WriteHeader(http.StatusOK)
+    w.Write([]byte(`{"message": "Logout successful"}`))
 }

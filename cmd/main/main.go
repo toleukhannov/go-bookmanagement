@@ -15,26 +15,9 @@ func main() {
 	routes.RegisterBookStoreRoutes(r)
 	http.Handle("/", r)
 
-
 	r.HandleFunc("/register", handler.SignUp).Methods("POST")
 	r.HandleFunc("/login", handler.Login).Methods("POST")
+	r.HandleFunc("/logout", handler.Logout).Methods("GET")
 
 	log.Fatal(http.ListenAndServe("localhost:9010", r))
-
-	// db := config.GetDB()
-	// res, err := db.Query("SELECT * FROM `users`")
-	// if err != nil{
-	// 	panic(err)
-	// }
-
-	// for res.Next(){
-	// 	var user models.User 
-	// 	err = res.Scan(&user.Username, &user.Password)
-	// 	if err !=nil{
-	// 		panic(err)
-	// 	}
-	// 	fmt.Println(fmt.Sprintf("User: %s, %s", user.Username, user.Password))
-	// }
-
-	// defer res.Close()
 }

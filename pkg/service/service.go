@@ -57,7 +57,7 @@ func SignUp(c *gin.Context) {
         return
     }
 
-    // Хэшируем пароль
+    // Hashing
     hashPassword, err := bcrypt.GenerateFromPassword([]byte(request.Password), bcrypt.DefaultCost)
     if err != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"})
@@ -66,7 +66,7 @@ func SignUp(c *gin.Context) {
     request.Password = string(hashPassword)
     request.CreatedAt = time.Now()
 
-    // Создание нового пользователя с помощью GORM
+    // New User GORM
     if err := config.GetDB().Create(&request).Error; err != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user"})
         return
@@ -82,27 +82,27 @@ func Login(c *gin.Context) {
         return
     }
 
-    // Поиск пользователя по имени пользователя
+    // user findByID
     var user models.User
     if err := config.GetDB().Where("username = ?", loginRequest.Username).First(&user).Error; err != nil {
         c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid username or password"})
         return
     }
 
-    // Проверка пароля
+    // pass checking
     if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(loginRequest.Password)); err != nil {
         c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid username or password"})
         return
     }
 
-    // Если аутентификация успешна, создаем токен и отправляем его пользователю
+    // If authentication is successful, we create a token and send it to the user
     token, err := createToken(user.Username)
     if err != nil {
         c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to create token"})
         return
     }
 
-    // Установка токена в куки
+    // Setting cookie token
     c.SetCookie("Authorization", token, 3600*24*30, "", "", false, true)
 
     c.JSON(http.StatusOK, gin.H{"message": "Login successful"})
