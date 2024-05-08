@@ -8,7 +8,7 @@ import(
 var db *gorm.DB
 
 func Connect(){
-	d, err := gorm.Open("mysql", "root:@/bookmanager?")
+	d, err := gorm.Open("mysql", "root:@tcp(127.0.0.1:3306)/bookmanager")
 
 	if err != nil{
 		panic(err)
